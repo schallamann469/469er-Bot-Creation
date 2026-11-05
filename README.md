@@ -1,46 +1,48 @@
 # 469er-Bot-Creation
 
-# Yin und Yang core (starter)
+# Yin-und-Yang-Kern (Starter)
 
-Small, reviewable, stdlib-only Python core (Python 3.9+, no third-party dependencies).
-It is **not** a finished or error-free production AI.
+Kleiner, prüfbarer Python-Kern ohne externe Abhängigkeiten (Python 3.9+, nur Standardbibliothek).
+Er ist **keine** fertige oder fehlerfreie Produktions-KI, sondern ein solider Grundkern zum Ausbauen.
+Alle Texte, Meldungen und Kommentare sind auf Deutsch; Code-Bezeichner und JSON-Feldnamen der API bleiben englisch (stabile Schnittstelle).
 
-## Roles
-- **Yin und Yang** – coordinator: plans, routes only when a specialist is needed.
-- **Visionär** – technical right hand/referee: returns several approaches (incl. one unusual option) with benefit, cost, risks, tests and a trade-off note; returns draft/patch suggestions only; cannot approve (approvals are human-only).
-- **AniForge** – isolated minimal placeholder; no store/provider/agent references, no shared data.
+## Rollen
+- **Yin und Yang** – Koordinator: nimmt Aufgaben an, plant, leitet nur bei Bedarf an einen Spezialisten weiter.
+- **Visionär** – technische rechte Hand/Schiedsrichter: liefert mehrere Ansätze (auch eine ungewöhnliche Option) mit Nutzen, Aufwand, Risiken, Tests und Abwägung; liefert nur Entwürfe/Patch-Vorschläge; kann nichts freigeben (Freigaben sind nur durch Menschen möglich).
+- **AniForge** – isolierter, minimaler Platzhalter; keine Referenz auf Speicher, Anbieter oder andere Agenten, keine geteilten Daten.
 
-## Layout (`yinyang_core/`)
-`api.py` HTTP · `orchestrator.py` routing/timeouts/retries · `agents/` · `permissions.py` tiers + approvals · `knowledge.py` SQLite · `audit.py` JSONL log (secrets redacted) · `lifecycle.py` start/stop · `providers.py` model interface · `reports.py` weekly report · `app.py` wiring.
+## Aufbau (`yinyang_core/`)
+`api.py` HTTP · `orchestrator.py` Routing/Zeitlimits/Wiederholungen · `agents/` · `permissions.py` Stufen + Freigaben · `knowledge.py` SQLite · `audit.py` JSONL-Log (Geheimnisse geschwärzt) · `lifecycle.py` Start/Stopp · `providers.py` Modell-Schnittstelle · `reports.py` Wochenbericht · `app.py` Verdrahtung.
 
-## Autonomy tiers
-1. Autonomous: read/analyze/plan/propose/report. 2. Bounded checks/tests in isolation. 3. Approval required: file changes, dependency installs, config changes, deploy. 4. Prohibited unless explicitly approved: delete, disclose confidential data, publish, paid actions. Unknown actions are treated as tier 4. Even when approved, this starter **executes none** of tier 3/4 – it only records the decision. No shell commands are run.
+## Autonomiestufen
+1. Autonom: lesen/analysieren/planen/vorschlagen/berichten. 2. Begrenzte Prüfungen/Tests in Isolation. 3. Freigabe nötig: Dateiänderungen, Abhängigkeiten installieren, Konfiguration ändern, Deployment. 4. Gesperrt ohne ausdrückliche Freigabe: Löschen, Weitergabe vertraulicher Daten, Veröffentlichen, kostenpflichtige Aktionen. Unbekannte Aktionen gelten als Stufe 4. Auch mit Freigabe **führt dieser Starter nichts aus Stufe 3/4 aus** – er protokolliert nur die Entscheidung. Es werden keine Shell-Befehle ausgeführt.
 
-## Install / run / test / stop
+## Installieren / Starten / Testen / Stoppen
 ```
-python -m yinyang_core                          # serves http://127.0.0.1:8469 (nothing to pip install)
-python -m unittest discover -v                  # tests
+python -m yinyang_core                          # startet http://127.0.0.1:8469 (nichts zu installieren)
+python -m unittest discover -v                  # Tests
 ```
-Stop with Ctrl+C or SIGTERM: new tasks are refused (503), in-flight tasks get `YY_SHUTDOWN_GRACE_S` seconds, then the store closes. Config is read from environment variables (see `.env.example`; it is not auto-loaded). Runtime data goes to `data/` (git-ignored).
+Stoppen mit Strg+C oder SIGTERM: neue Aufgaben werden abgelehnt (503), laufende bekommen `YY_SHUTDOWN_GRACE_S` Sekunden, danach wird der Speicher geschlossen. Konfiguration über Umgebungsvariablen (siehe `.env.example`, wird nicht automatisch geladen). Laufzeitdaten liegen in `data/` (von Git ignoriert).
+Der Start prüft die Gesundheit (z. B. Datenbank) und bricht bei Fehlern kontrolliert ab.
 
 ## API
-- `GET /health` – state, checks, provider (`is_mock`); 503 unless running.
-- `POST /tasks` `{"task": "...", "agent": optional}` – without `agent`, Yin und Yang plans and routes.
-- `GET /approvals`, `POST /approvals/{id}/decision` `{"decision":"approve|reject","decided_by":"alice","explicit":false}` – agent names are rejected as deciders.
-- `POST /reports/weekly` – generate and store a weekly technical report.
+- `GET /health` – Zustand, Prüfungen, Anbieter (`is_mock`); 503, solange nicht „running“.
+- `POST /tasks` `{"task": "...", "agent": optional}` – ohne `agent` plant Yin und Yang und leitet weiter.
+- `GET /approvals`, `POST /approvals/{id}/decision` `{"decision":"approve|reject","decided_by":"alice","explicit":false}` – Agentennamen werden als Entscheider abgelehnt.
+- `POST /reports/weekly` – Wochenbericht erzeugen und speichern.
 
 ```
-curl -s localhost:8469/tasks -d '{"task":"find the performance bottleneck in my code"}'
+curl -s localhost:8469/tasks -d '{"task":"finde den Engpass in meinem Code"}'
 ```
 
-## Weekly report / scheduling
-`WeeklyReportService.generate()` (also `POST /reports/weekly`) fetches sources from `YY_REPORT_SOURCES` (`name=https://...`, https only, size/time bounded) and stores the report with sources and retrieval timestamps. **Nothing runs weekly yet.** To schedule later, call the endpoint from cron/a systemd timer, e.g. `0 8 * * 1 curl -X POST localhost:8469/reports/weekly`. It never installs or modifies anything.
+## Wochenbericht / Zeitsteuerung
+`WeeklyReportService.generate()` (auch `POST /reports/weekly`) ruft Quellen aus `YY_REPORT_SOURCES` ab (`name=https://...`, nur https, begrenzte Größe/Zeit) und speichert den Bericht mit Quellen und Abrufzeitpunkten. **Es läuft noch nichts automatisch wöchentlich.** Später z. B. per Cron: `0 8 * * 1 curl -X POST localhost:8469/reports/weekly`. Es wird nie etwas installiert oder geändert.
 
-## Inventory of mocks / placeholders / limits
-- Model provider: **mock only** (`MockProvider`); gives no real AI answers. Other names raise an error. No API keys are read.
-- Visionär proposals are static templates, not model-generated analysis.
-- AniForge is a placeholder; Yin und Yang routing is keyword-based.
-- Approvals are in memory (lost on restart); the HTTP API has no authentication – keep it on localhost.
-- Task timeouts are cooperative: a timed-out thread cannot be killed, only abandoned.
-- Tier 2 isolated test execution is defined but not implemented.
-- Knowledge store accepts only explicitly approved entries (Python API; no HTTP endpoint yet); secret detection is pattern-based and best-effort.
+## Übersicht: Mocks / Platzhalter / Grenzen
+- Modell-Anbieter: **nur Mock** (`MockProvider`); liefert keine echten KI-Antworten. Andere Namen führen zu einem Fehler. Es werden keine API-Schlüssel gelesen.
+- Visionärs Vorschläge sind feste Vorlagen, keine modellgenerierte Analyse.
+- AniForge ist ein Platzhalter; das Routing von Yin und Yang arbeitet mit Stichwörtern (deutsch/englisch).
+- Freigaben liegen im Speicher (nach Neustart weg); die HTTP-API hat keine Authentifizierung – nur auf localhost betreiben.
+- Zeitlimits sind kooperativ: ein abgelaufener Thread wird verworfen, nicht beendet.
+- Stufe 2 (isolierte Testausführung) ist definiert, aber nicht implementiert.
+- Der Wissensspeicher nimmt nur ausdrücklich freigegebene Einträge an (Python-API, noch kein HTTP-Endpunkt); Geheimniserkennung ist musterbasiert und nur ein Best-Effort.

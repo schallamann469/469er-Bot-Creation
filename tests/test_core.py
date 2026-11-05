@@ -48,7 +48,7 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(body["provider"]["is_mock"])
 
     def test_task_routes_to_visionar_only(self):
-        code, body = self.call("POST", "/tasks", {"task": "find the performance bottleneck in code"})
+        code, body = self.call("POST", "/tasks", {"task": "finde den Engpass im Code"})
         self.assertEqual(code, 200)
         self.assertEqual([r["agent"] for r in body["results"]], ["yin_yang", "visionar"])
         v = body["results"][1]
@@ -57,7 +57,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(v["status"], "draft")
 
     def test_simple_task_not_routed_and_marked_mock(self):
-        _, body = self.call("POST", "/tasks", {"task": "hello"})
+        _, body = self.call("POST", "/tasks", {"task": "hallo"})
         self.assertEqual(len(body["results"]), 1)
         self.assertIn("MOCK", body["results"][0]["answer"])
 
@@ -68,7 +68,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.call("GET", "/nothing")[0], 404)
 
     def test_approval_endpoint_blocks_agents(self):
-        _, body = self.call("POST", "/tasks", {"task": "a bug", "agent": "visionar"})
+        _, body = self.call("POST", "/tasks", {"task": "ein Fehler", "agent": "visionar"})
         rid = body["results"][0]["approval_request_id"]
         self.assertEqual(self.call("POST", f"/approvals/{rid}/decision",
                                    {"decision": "approve", "decided_by": "visionar"})[0], 403)
@@ -153,13 +153,14 @@ class AgentTests(unittest.TestCase):
 
     def test_yin_yang_routes_animation_without_logic(self):
         y = YinYangAgent(MockProvider())
-        self.assertEqual(y.plan("make an animation")["route_to"], "aniforge")
-        self.assertIsNone(y.plan("hello")["route_to"])
+        self.assertEqual(y.plan("mache eine Animation")["route_to"], "aniforge")
+        self.assertEqual(y.plan("Fehler im Code")["route_to"], "visionar")
+        self.assertIsNone(y.plan("hallo")["route_to"])
 
     def test_visionar_cannot_approve(self):
         w = ApprovalWorkflow()
         v = VisionarAgent(w)
-        res = v.run("fix bug")
+        res = v.run("Fehler beheben")
         self.assertFalse(hasattr(v, "review"))
         with self.assertRaises(PermissionDenied):
             w.decide(res["approval_request_id"], True, "visionar")
@@ -235,7 +236,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_audit_redacts_secrets(self):
         core = make_core()
-        core.audit.write("x", task="my token=abc123 and sk-abcdefghijklmnopqrstuv", api_key="zzz")
+        core.audit.write("x", task="mein token=abc123 und sk-abcdefghijklmnopqrstuv", api_key="zzz")
         rec = core.audit.read_all()[-1]
         self.assertNotIn("abc123", json.dumps(rec))
         self.assertNotIn("zzz", json.dumps(rec))

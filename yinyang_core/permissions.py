@@ -1,13 +1,13 @@
-"""Autonomy tiers and the approval workflow.
+"""Autonomiestufen und Freigabe-Workflow.
 
-Tier 1 AUTONOMOUS : read/analyze/plan/propose/report
-Tier 2 BOUNDED    : bounded checks/tests in an isolated environment
-Tier 3 APPROVAL   : file changes, dependency installs, config changes, deployment
-Tier 4 PROHIBITED : deletion, external disclosure of confidential data,
-                    publication, paid actions (only with explicit approval)
+Stufe 1 AUTONOMOUS : lesen/analysieren/planen/vorschlagen/berichten
+Stufe 2 BOUNDED    : begrenzte Prüfungen/Tests in isolierter Umgebung
+Stufe 3 APPROVAL   : Dateiänderungen, Abhängigkeiten installieren, Konfigurationsänderungen, Deployment
+Stufe 4 PROHIBITED : Löschen, Weitergabe vertraulicher Daten nach außen,
+                    Veröffentlichung, kostenpflichtige Aktionen (nur mit ausdrücklicher Freigabe)
 
-This starter never *executes* tier 3/4 actions. Approval is only recorded;
-agents return drafts/patch suggestions.
+Dieser Starter *führt* Aktionen der Stufen 3/4 nie aus. Freigaben werden nur
+protokolliert; Agenten liefern Entwürfe/Patch-Vorschläge.
 """
 import itertools
 import threading
@@ -46,7 +46,7 @@ AGENT_NAMES = ("yin_yang", "visionar", "aniforge")
 
 
 def tier_of(action: str) -> Tier:
-    """Unknown actions are treated as prohibited (fail closed)."""
+    """Unbekannte Aktionen gelten als verboten (im Zweifel gesperrt)."""
     return ACTION_TIERS.get(action, Tier.PROHIBITED)
 
 
@@ -72,7 +72,7 @@ class ApprovalRequest:
 
 
 class ApprovalWorkflow:
-    """In-memory approval queue. Agents may request; only a non-agent may decide."""
+    """Freigabe-Warteschlange im Speicher. Agenten dürfen anfragen; nur Nicht-Agenten dürfen entscheiden."""
 
     def __init__(self, audit=None):
         self._audit = audit
@@ -85,7 +85,7 @@ class ApprovalWorkflow:
             self._audit.write(event, **f)
 
     def check(self, action: str, approval_id: Optional[int] = None) -> None:
-        """Raise PermissionDenied unless the action is allowed right now."""
+        """Wirft PermissionDenied, wenn die Aktion jetzt nicht erlaubt ist."""
         tier = tier_of(action)
         if tier <= Tier.BOUNDED:
             return
@@ -98,7 +98,7 @@ class ApprovalWorkflow:
         )
         if not ok:
             self._log("permission_denied", action=action, tier=int(tier), approval_id=approval_id)
-            raise PermissionDenied(f"action '{action}' (tier {int(tier)}) requires explicit approval")
+            raise PermissionDenied(f"Aktion '{action}' (Stufe {int(tier)}) erfordert ausdrückliche Freigabe")
 
     def request(self, action: str, description: str, requested_by: str) -> ApprovalRequest:
         tier = tier_of(action)
@@ -110,17 +110,17 @@ class ApprovalWorkflow:
 
     def decide(self, request_id: int, approve: bool, decided_by: str, explicit: bool = False) -> ApprovalRequest:
         if decided_by in AGENT_NAMES:
-            raise PermissionDenied("agents cannot approve requests")
+            raise PermissionDenied("Agenten dürfen Anfragen nicht freigeben")
         with self._lock:
             req = self._requests.get(request_id)
             if req is None:
                 raise KeyError(request_id)
             if req.status != "pending":
-                raise ValueError("request already decided")
+                raise ValueError("Anfrage wurde bereits entschieden")
             if decided_by == req.requested_by:
-                raise PermissionDenied("requester cannot approve own request")
+                raise PermissionDenied("Antragsteller darf die eigene Anfrage nicht freigeben")
             if approve and req.tier >= Tier.PROHIBITED and not explicit:
-                raise PermissionDenied("tier 4 actions need explicit=true approval")
+                raise PermissionDenied("Aktionen der Stufe 4 erfordern explicit=true")
             req.status = "approved" if approve else "rejected"
             req.decided_by = decided_by
             req.explicit = bool(explicit and approve)

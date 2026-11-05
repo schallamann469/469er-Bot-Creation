@@ -1,8 +1,9 @@
-"""Yin und Yang: general assistant/coordinator. Plans and routes only when appropriate."""
+"""Yin und Yang: allgemeiner Assistent/Koordinator. Plant und leitet nur bei Bedarf weiter."""
 from typing import Optional
 
-TECH_WORDS = ("code", "bug", "refactor", "performance", "bottleneck", "slow", "optimi", "architecture", "test", "sql")
-ANIMATION_WORDS = ("animation", "animate", "animier")  # routing keywords only; no domain logic here
+TECH_WORDS = ("code", "bug", "fehler", "refactor", "performance", "leistung", "engpass", "bottleneck", "langsam",
+              "slow", "optimi", "architektur", "architecture", "test", "sql")
+ANIMATION_WORDS = ("animation", "animate", "animier", "zeichentrick")  # nur Routing-Stichwörter; keine Fachlogik hier
 
 
 class YinYangAgent:
@@ -18,8 +19,8 @@ class YinYangAgent:
         elif any(w in t for w in TECH_WORDS):
             target = "visionar"
         else:
-            target = None  # handle directly; no routing needed
-        steps = ["understand task", "route to " + target if target else "answer directly", "report result"]
+            target = None  # direkt beantworten; kein Routing nötig
+        steps = ["Aufgabe verstehen", "weiterleiten an " + target if target else "direkt antworten", "Ergebnis berichten"]
         return {"route_to": target, "steps": steps}
 
     def run(self, task: str) -> dict:

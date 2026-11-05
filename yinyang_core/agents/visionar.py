@@ -1,7 +1,7 @@
-"""Visionär: technical right hand / referee. Proposes options; never approves its own changes.
+"""Visionär: technische rechte Hand / Schiedsrichter. Schlägt Optionen vor; gibt eigene Änderungen nie selbst frei.
 
-Approval decisions are human-only (ApprovalWorkflow.decide rejects agent names), so Visionär
-cannot approve its own or anyone else's changes."""
+Freigaben sind nur durch Menschen möglich (ApprovalWorkflow.decide lehnt Agentennamen ab);
+Visionär kann also weder eigene noch fremde Änderungen freigeben."""
 from ..permissions import ApprovalWorkflow
 
 
@@ -14,29 +14,29 @@ class VisionarAgent:
     def propose(self, task: str) -> dict:
         approaches = [
             {
-                "name": "Measure first, then fix the hot path (conventional)",
+                "name": "Erst messen, dann den kritischen Pfad beheben (konventionell)",
                 "unusual": False,
-                "expected_benefit": "Targets the real bottleneck; low regression risk.",
-                "cost_complexity": "Low: add timing/profiling, fix one hotspot.",
-                "risks": ["Profile may not reflect production load"],
-                "tests": ["Benchmark before/after", "Regression tests on touched code"],
+                "expected_benefit": "Zielt auf den echten Engpass; geringes Regressionsrisiko.",
+                "cost_complexity": "Gering: Zeitmessung/Profiling ergänzen, einen Hotspot beheben.",
+                "risks": ["Profil entspricht evtl. nicht der Produktionslast"],
+                "tests": ["Benchmark vorher/nachher", "Regressionstests für geänderten Code"],
             },
             {
-                "name": "Cache or batch repeated work (moderate)",
+                "name": "Wiederholte Arbeit cachen oder bündeln (moderat)",
                 "unusual": False,
-                "expected_benefit": "Fewer repeated computations/IO calls.",
-                "cost_complexity": "Medium: invalidation rules and memory bounds.",
-                "risks": ["Stale data", "Extra memory"],
-                "tests": ["Cache hit/miss tests", "Invalidation tests", "Bounded-size test"],
+                "expected_benefit": "Weniger wiederholte Berechnungen/IO-Aufrufe.",
+                "cost_complexity": "Mittel: Invalidierungsregeln und Speichergrenzen.",
+                "risks": ["Veraltete Daten", "Mehr Speicherbedarf"],
+                "tests": ["Cache-Treffer/-Fehlgriff-Tests", "Invalidierungstests", "Test der Größenbegrenzung"],
             },
             {
-                "name": "Record-and-replay shadow run (creative/unusual)",
+                "name": "Aufzeichnen-und-Wiederholen als Schattenlauf (kreativ/ungewöhnlich)",
                 "unusual": True,
-                "expected_benefit": "Replay recorded real inputs against old and new implementations "
-                                    "to compare output and timing without touching production.",
-                "cost_complexity": "High: recording layer, replay harness, diff tooling.",
-                "risks": ["Recorded data may be sensitive", "Over-engineering for small problems"],
-                "tests": ["Replay equivalence test", "Redaction test on recordings"],
+                "expected_benefit": "Aufgezeichnete echte Eingaben gegen alte und neue Implementierung abspielen, "
+                                    "um Ausgabe und Laufzeit ohne Eingriff in die Produktion zu vergleichen.",
+                "cost_complexity": "Hoch: Aufzeichnungsschicht, Replay-Rahmen, Diff-Werkzeuge.",
+                "risks": ["Aufgezeichnete Daten können sensibel sein", "Überdimensioniert für kleine Probleme"],
+                "tests": ["Replay-Äquivalenztest", "Schwärzungstest für Aufzeichnungen"],
             },
         ]
         return {
@@ -44,14 +44,14 @@ class VisionarAgent:
             "task": task,
             "status": "draft",
             "approaches": approaches,
-            "tradeoffs": "Unusual does not mean better: the unusual option has the highest cost and "
-                         "is only worthwhile if the conventional options are insufficient.",
-            "patch_suggestion": "# DRAFT ONLY - no files were modified. Needs explicit approval to apply.\n",
+            "tradeoffs": "Ungewöhnlich heißt nicht besser: Die ungewöhnliche Option hat den höchsten Aufwand "
+                         "und lohnt sich nur, wenn die konventionellen Optionen nicht ausreichen.",
+            "patch_suggestion": "# NUR ENTWURF - es wurden keine Dateien geändert. Anwenden erfordert ausdrückliche Freigabe.\n",
             "requires_approval_to_apply": True,
         }
 
     def run(self, task: str) -> dict:
         result = self.propose(task)
-        req = self._workflow.request("modify_file", f"Apply draft for: {task[:200]}", self.name)
+        req = self._workflow.request("modify_file", f"Entwurf anwenden für: {task[:200]}", self.name)
         result["approval_request_id"] = req.id
         return result

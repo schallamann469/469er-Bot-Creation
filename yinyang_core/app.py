@@ -1,4 +1,4 @@
-"""Wiring: builds all components from Settings."""
+"""Verdrahtung: baut alle Komponenten aus den Einstellungen."""
 from .agents import AniForgeAgent, VisionarAgent, YinYangAgent
 from .audit import AuditLog
 from .knowledge import KnowledgeStore

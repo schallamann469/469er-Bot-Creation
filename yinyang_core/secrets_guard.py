@@ -1,4 +1,4 @@
-"""Detect and redact secret-looking strings (used by audit log and knowledge store)."""
+"""Erkennt und schwärzt geheimnisähnliche Zeichenfolgen (für Audit-Log und Wissensspeicher)."""
 import re
 
 _PATTERNS = [
@@ -9,7 +9,7 @@ _PATTERNS = [
     re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd)\b\s*[:=]\s*\S+"),
 ]
 _SENSITIVE_KEYS = ("key", "secret", "token", "password", "passwd", "authorization")
-REDACTED = "[REDACTED]"
+REDACTED = "[GESCHWÄRZT]"
 
 
 def contains_secret(text: str) -> bool:
@@ -17,7 +17,7 @@ def contains_secret(text: str) -> bool:
 
 
 def redact(value, _depth=0):
-    """Recursively redact secrets from str/dict/list values."""
+    """Schwärzt Geheimnisse rekursiv in str-/dict-/list-Werten."""
     if _depth > 6:
         return REDACTED
     if isinstance(value, str):

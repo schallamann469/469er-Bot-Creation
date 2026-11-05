@@ -1,4 +1,4 @@
-"""Run: python -m yinyang_core  (Ctrl+C for graceful shutdown)."""
+"""Start: python -m yinyang_core  (Strg+C für geordnetes Beenden)."""
 import signal
 import threading
 
@@ -15,13 +15,13 @@ def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print(f"listening on http://{server.server_address[0]}:{server.server_address[1]} (provider: mock)")
+    print(f"lauscht auf http://{server.server_address[0]}:{server.server_address[1]} (Anbieter: mock)")
     stop.wait()
-    core.lifecycle.stop()  # stop accepting + drain before closing the socket
+    core.lifecycle.stop()  # keine neuen Aufgaben + laufende beenden, bevor der Socket schließt
     server.shutdown()
     server.server_close()
     core.stop()
-    print("stopped")
+    print("gestoppt")
 
 
 if __name__ == "__main__":

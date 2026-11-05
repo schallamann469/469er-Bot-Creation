@@ -1,4 +1,4 @@
-"""Controlled start/stop lifecycle with startup health validation."""
+"""Kontrollierter Start/Stopp mit Gesundheitsprüfung beim Start."""
 import threading
 import time
 
@@ -28,7 +28,7 @@ class Lifecycle:
         if failed:
             self.state = "failed"
             self._audit.write("startup_failed", failed_checks=failed)
-            raise StartupError(f"startup health checks failed: {failed}")
+            raise StartupError(f"Gesundheitsprüfung beim Start fehlgeschlagen: {failed}")
         self.state = "running"
         self._audit.write("started")
 
@@ -45,7 +45,7 @@ class Lifecycle:
             self._cv.notify_all()
 
     def stop(self) -> bool:
-        """Stop accepting tasks, wait up to grace for in-flight ones. Returns True if drained."""
+        """Nimmt keine Aufgaben mehr an und wartet bis zur Karenzzeit auf laufende. Gibt True zurück, wenn alles beendet ist."""
         with self._cv:
             if self.state in ("stopped", "stopping"):
                 return True

@@ -1,4 +1,4 @@
-"""Configuration from environment variables. No secrets are required or logged."""
+"""Konfiguration über Umgebungsvariablen. Es werden keine Geheimnisse benötigt oder protokolliert."""
 import os
 from dataclasses import dataclass, field
 from typing import Tuple
@@ -16,7 +16,7 @@ class Settings:
     max_retries: int = 1
     shutdown_grace_s: float = 5.0
     max_workers: int = 4
-    # "name=https://url" entries; empty by default (no network access).
+    # Einträge der Form "name=https://url"; standardmäßig leer (kein Netzwerkzugriff).
     report_sources: Tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod

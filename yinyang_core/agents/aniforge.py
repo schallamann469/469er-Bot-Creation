@@ -1,7 +1,7 @@
-"""AniForge: isolated minimal animation module.
+"""AniForge: isoliertes, minimales Animationsmodul.
 
-Deliberately takes no store, provider, or other agent references: no shared
-memory/data with other agents by default.
+Bekommt bewusst keinen Speicher, Anbieter oder andere Agenten-Referenzen:
+standardmäßig kein gemeinsamer Speicher/keine gemeinsamen Daten mit anderen Agenten.
 """
 
 
@@ -9,13 +9,13 @@ class AniForgeAgent:
     name = "aniforge"
 
     def __init__(self):
-        self._notes = []  # private to this agent
+        self._notes = []  # nur für diesen Agenten
 
     def run(self, task: str) -> dict:
         self._notes.append(task)
         return {
             "agent": self.name,
             "status": "placeholder",
-            "outline": ["define scene list", "define keyframes", "review with user"],
-            "note": "Minimal placeholder: no animation is produced in this starter.",
+            "outline": ["Szenenliste festlegen", "Keyframes festlegen", "mit Nutzer abstimmen"],
+            "note": "Minimaler Platzhalter: Dieser Starter erzeugt keine Animation.",
         }

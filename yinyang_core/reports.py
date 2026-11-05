@@ -1,7 +1,7 @@
-"""Weekly technical update report service (callable; NOT scheduled by this starter).
+"""Dienst für den wöchentlichen Technik-Update-Bericht (aufrufbar; von diesem Starter NICHT zeitgesteuert).
 
-To schedule later: call WeeklyReportService.generate() from cron/systemd timer
-or a task scheduler. Nothing is installed or changed automatically.
+Später planen: WeeklyReportService.generate() per Cron/systemd-Timer oder
+Aufgabenplaner aufrufen. Es wird nichts automatisch installiert oder geändert.
 """
 import json
 from datetime import datetime, timezone
@@ -17,14 +17,14 @@ def parse_sources(entries: Sequence[str]) -> List[Dict[str, str]]:
     for e in entries:
         name, sep, url = e.partition("=")
         if not sep or urlparse(url).scheme != "https":
-            raise ValueError(f"invalid report source '{name}': expected name=https://...")
+            raise ValueError(f"ungültige Berichtsquelle '{name}': erwartet name=https://...")
         out.append({"name": name.strip(), "url": url.strip()})
     return out
 
 
 def http_fetch(url: str) -> str:
     if urlparse(url).scheme != "https":
-        raise ValueError("only https sources are allowed")
+        raise ValueError("nur https-Quellen sind erlaubt")
     with urlopen(Request(url, headers={"User-Agent": "yinyang-core"}), timeout=10) as r:  # noqa: S310
         return r.read(MAX_BYTES).decode("utf-8", "replace")
 
@@ -41,14 +41,14 @@ class WeeklyReportService:
                 text = self._fetch(s["url"])
                 items.append({"source": s["name"], "url": s["url"], "retrieved_at": retrieved,
                               "excerpt": text[:300], "error": None})
-            except Exception as exc:  # report per-source failure, keep going
+            except Exception as exc:  # Fehler je Quelle melden, weitermachen
                 items.append({"source": s["name"], "url": s["url"], "retrieved_at": retrieved,
                               "excerpt": "", "error": type(exc).__name__})
         report = {
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "items": items,
-            "note": "Informational only. Nothing was installed or modified." if items
-                    else "No sources configured (set YY_REPORT_SOURCES).",
+            "note": "Nur zur Information. Es wurde nichts installiert oder geändert." if items
+                    else "Keine Quellen konfiguriert (YY_REPORT_SOURCES setzen).",
         }
         report["id"] = self._store.save_report("weekly_tech_update", json.dumps(report, ensure_ascii=False))
         self._audit.write("weekly_report_generated", id=report["id"], sources=len(items))

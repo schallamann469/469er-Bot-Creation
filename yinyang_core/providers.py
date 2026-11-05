@@ -1,4 +1,4 @@
-"""Model-provider interface. Only a MOCK is implemented; no API keys are read."""
+"""Schnittstelle für Modell-Anbieter. Nur ein MOCK ist implementiert; es werden keine API-Schlüssel gelesen."""
 from abc import ABC, abstractmethod
 
 
@@ -15,18 +15,18 @@ class ModelProvider(ABC):
 
 
 class MockProvider(ModelProvider):
-    """Deterministic placeholder. It does NOT produce real AI answers."""
+    """Deterministischer Platzhalter. Er liefert KEINE echten KI-Antworten."""
 
     name = "mock"
     is_mock = True
 
     def generate(self, prompt: str) -> str:
-        return f"[MOCK PROVIDER - not a real AI answer] received {len(prompt)} characters."
+        return f"[MOCK-ANBIETER - keine echte KI-Antwort] {len(prompt)} Zeichen empfangen."
 
 
 def get_provider(name: str) -> ModelProvider:
     if name == "mock":
         return MockProvider()
     raise ProviderError(
-        f"provider '{name}' is not implemented in this starter; implement ModelProvider and register it here"
+        f"Anbieter '{name}' ist in diesem Starter nicht implementiert; ModelProvider implementieren und hier registrieren"
     )

@@ -1,4 +1,4 @@
-"""Append-only JSONL audit log with secret redaction and value truncation."""
+"""Nur anhängendes JSONL-Audit-Log mit Geheimnis-Schwärzung und Kürzung langer Werte."""
 import json
 import threading
 from datetime import datetime, timezone
@@ -11,7 +11,7 @@ _MAX_STR = 500
 
 def _truncate(v):
     if isinstance(v, str):
-        return v if len(v) <= _MAX_STR else v[:_MAX_STR] + "...[truncated]"
+        return v if len(v) <= _MAX_STR else v[:_MAX_STR] + "...[gekürzt]"
     if isinstance(v, dict):
         return {k: _truncate(x) for k, x in v.items()}
     if isinstance(v, (list, tuple)):

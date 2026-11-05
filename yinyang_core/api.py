@@ -1,4 +1,4 @@
-"""Minimal HTTP API (stdlib). Bind to localhost only; there is no authentication."""
+"""Minimale HTTP-API (stdlib). Nur an localhost binden; es gibt keine Authentifizierung."""
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -10,7 +10,7 @@ MAX_BODY = 16_384
 
 def make_handler(core):
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *a):  # audit log is used instead
+        def log_message(self, *a):  # stattdessen wird das Audit-Log verwendet
             pass
 
         def _send(self, code, body):
@@ -24,13 +24,13 @@ def make_handler(core):
         def _body(self):
             n = int(self.headers.get("Content-Length") or 0)
             if n > MAX_BODY:
-                raise TaskRejected("body too large", 413)
+                raise TaskRejected("Anfragekörper zu groß", 413)
             try:
                 obj = json.loads(self.rfile.read(n) or b"{}")
             except ValueError:
-                raise TaskRejected("invalid JSON")
+                raise TaskRejected("ungültiges JSON")
             if not isinstance(obj, dict):
-                raise TaskRejected("JSON object expected")
+                raise TaskRejected("JSON-Objekt erwartet")
             return obj
 
         def do_GET(self):
@@ -40,7 +40,7 @@ def make_handler(core):
                 return self._send(200 if h["ok"] else 503, h)
             if self.path == "/approvals":
                 return self._send(200, {"approvals": [r.to_dict() for r in core.workflow.list()]})
-            self._send(404, {"error": "not found"})
+            self._send(404, {"error": "nicht gefunden"})
 
         def do_POST(self):
             try:
@@ -55,18 +55,18 @@ def make_handler(core):
                     return self._send(200, req.to_dict())
                 if self.path == "/reports/weekly":
                     if core.lifecycle.state != "running":
-                        raise TaskRejected("service is not running", 503)
+                        raise TaskRejected("Dienst läuft nicht", 503)
                     return self._send(200, core.reports.generate())
-                self._send(404, {"error": "not found"})
+                self._send(404, {"error": "nicht gefunden"})
             except TaskRejected as e:
                 self._send(e.code, {"error": str(e)})
             except PermissionDenied as e:
                 self._send(403, {"error": str(e)})
             except (KeyError, ValueError, IndexError) as e:
-                self._send(400, {"error": f"bad request: {type(e).__name__}"})
+                self._send(400, {"error": f"ungültige Anfrage: {type(e).__name__}"})
             except Exception as e:
                 core.audit.write("api_error", error=type(e).__name__)
-                self._send(500, {"error": "internal error"})
+                self._send(500, {"error": "interner Fehler"})
 
     return Handler
 

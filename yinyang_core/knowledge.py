@@ -1,4 +1,4 @@
-"""Local SQLite knowledge store. Only explicitly approved entries; never secrets."""
+"""Lokaler SQLite-Wissensspeicher. Nur ausdrücklich freigegebene Einträge; niemals Geheimnisse."""
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -52,13 +52,13 @@ class KnowledgeStore:
     def add(self, kind: str, title: str, content: str, source: str,
             approved: bool = False, approved_by: Optional[str] = None) -> int:
         if kind not in KINDS:
-            raise KnowledgeError(f"invalid kind '{kind}'")
+            raise KnowledgeError(f"ungültige Art '{kind}'")
         if not approved or not approved_by:
-            raise KnowledgeError("only explicitly approved entries may be stored")
+            raise KnowledgeError("nur ausdrücklich freigegebene Einträge dürfen gespeichert werden")
         if not title or not content:
-            raise KnowledgeError("title and content are required")
+            raise KnowledgeError("Titel und Inhalt sind erforderlich")
         if contains_secret(title) or contains_secret(content) or contains_secret(source):
-            raise KnowledgeError("entry looks like it contains a secret; refusing to store")
+            raise KnowledgeError("Eintrag enthält vermutlich ein Geheimnis; Speichern abgelehnt")
         with self._lock:
             cur = self._conn.execute(
                 "INSERT INTO knowledge(kind,title,content,source,approved_by,created_at) VALUES (?,?,?,?,?,?)",
@@ -77,7 +77,7 @@ class KnowledgeStore:
 
     def save_report(self, kind: str, body: str) -> int:
         if contains_secret(body):
-            raise KnowledgeError("report looks like it contains a secret; refusing to store")
+            raise KnowledgeError("Bericht enthält vermutlich ein Geheimnis; Speichern abgelehnt")
         with self._lock:
             cur = self._conn.execute("INSERT INTO reports(kind,body,created_at) VALUES (?,?,?)", (kind, body, _now()))
             self._conn.commit()

@@ -1,3 +1,3 @@
-"""Yin und Yang core: a small, safe, reviewable starter (no autonomous writes)."""
+"""Yin-und-Yang-Kern: ein kleiner, sicherer, prüfbarer Starter (keine autonomen Schreibzugriffe)."""
 
 __version__ = "0.1.0"
