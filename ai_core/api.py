@@ -23,6 +23,7 @@ def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
                 return
             if self.path not in {
                 "/tasks",
+                "/language",
                 "/reports/weekly",
                 "/proposals/code",
             }:
@@ -37,6 +38,9 @@ def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
                     raise ValueError("Request body must be a JSON object.")
                 if self.path == "/tasks":
                     result = service.submit_task(body.get("task"))
+                    self._respond(200, result)
+                elif self.path == "/language":
+                    result = service.generate_language_response(body.get("prompt"))
                     self._respond(200, result)
                 elif self.path == "/proposals/code":
                     result = service.propose_code(

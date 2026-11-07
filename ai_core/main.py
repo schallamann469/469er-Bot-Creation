@@ -5,6 +5,7 @@ import os
 from http.server import ThreadingHTTPServer
 
 from .api import create_server
+from .language import provider_from_environment
 from .service import CoreService
 
 
@@ -14,6 +15,7 @@ def main() -> None:
     service = CoreService(
         os.getenv("AI_CORE_DATABASE", "data/knowledge.sqlite3"),
         configured_sources=sources,
+        language_provider=provider_from_environment(),
     )
     server = create_server(
         service,

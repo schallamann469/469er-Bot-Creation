@@ -10,6 +10,12 @@ from ai_core.agents import AniForge, Visionary, YinAndYang
 from ai_core.approvals import ApprovalManager, ApprovalStatus, PatchProposal
 from ai_core.api import create_server
 from ai_core.code_proposals import CodeProposalService
+from ai_core.language import (
+    LanguageService,
+    OpenAICompatibleProvider,
+    _NoRedirect,
+    provider_from_environment,
+)
 from ai_core.knowledge import KnowledgeStore
 from ai_core.providers import MockProvider
 from ai_core.service import CoreService
@@ -135,6 +141,73 @@ class CodeProposalTests(unittest.TestCase):
             CodeProposalService(SecretProvider()).create("Write code")
 
 
+class LanguageTests(unittest.TestCase):
+    def test_external_provider_is_disabled_by_default_and_requires_opt_in(self):
+        self.assertEqual(provider_from_environment({}).name, "mock")
+        with self.assertRaises(ValueError):
+            provider_from_environment({"AI_LANGUAGE_PROVIDER": "openai-compatible"})
+        provider = provider_from_environment(
+            {
+                "AI_LANGUAGE_PROVIDER": "openai-compatible",
+                "AI_LANGUAGE_EXTERNAL_ENABLED": "true",
+                "AI_LANGUAGE_ENDPOINT": "https://provider.example/v1/chat/completions",
+                "AI_LANGUAGE_MODEL": "example-model",
+                "AI_LANGUAGE_API_KEY": "test-token",
+            }
+        )
+        self.assertEqual(provider.name, "openai-compatible:example-model")
+
+    def test_external_provider_sends_bounded_request_without_redirects(self):
+        provider = OpenAICompatibleProvider(
+            endpoint="https://provider.example/v1/chat/completions",
+            model="example-model",
+            api_key="test-token",
+        )
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self, limit):
+                self.limit = limit
+                return b'{"choices":[{"message":{"content":"Hallo"}}]}'
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                self.timeout = timeout
+                return FakeResponse()
+
+        opener = FakeOpener()
+        provider._opener = opener
+        self.assertEqual(provider.generate("Guten Tag", timeout=2), "Hallo")
+        self.assertEqual(
+            opener.request.get_header("Authorization"), "Bearer " + "test-token"
+        )
+        self.assertEqual(opener.timeout, 2)
+        self.assertNotIn("test-token", opener.request.data.decode())
+        self.assertIsNone(
+            _NoRedirect().redirect_request(
+                None, None, 302, "", {}, "https://other.example/"
+            )
+        )
+
+    def test_language_service_rejects_secret_prompts_and_discloses_mock(self):
+        service = LanguageService()
+        self.assertIn("MOCK", service.generate("hello"))
+        with self.assertRaises(ValueError):
+            service.generate("api_key=not-a-real-key")
+        with self.assertRaises(ValueError):
+            OpenAICompatibleProvider(
+                endpoint="http://provider.example/chat",
+                model="model",
+                api_key="test-token",
+            )
+
+
 class LifecycleTests(unittest.TestCase):
     def test_stop_rejects_new_tasks_and_waits_for_active_work(self):
         temp = tempfile.TemporaryDirectory()
@@ -185,7 +258,18 @@ class APITests(unittest.TestCase):
         self.connection.request("GET", "/health")
         response = self.connection.getresponse()
         self.assertEqual(response.status, 200)
-        self.assertTrue(json.loads(response.read())["accepting_tasks"])
+        health = json.loads(response.read())
+        self.assertTrue(health["accepting_tasks"])
+        self.assertEqual(health["language_provider"], "mock")
+
+        self.connection.request(
+            "POST", "/language", body=json.dumps({"prompt": "Hello"}),
+            headers={"Content-Type": "application/json"},
+        )
+        response = self.connection.getresponse()
+        language_result = json.loads(response.read())
+        self.assertEqual(language_result["provider"], "mock")
+        self.assertIn("MOCK", language_result["response"])
 
         self.connection.request(
             "POST", "/tasks", body=json.dumps({"task": "Plan a small change."}),

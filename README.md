@@ -25,16 +25,37 @@ lokal unter `data/knowledge.sqlite3` angelegt.
 - `GET /health` prüft SQLite und meldet Annahmestatus sowie laufende Aufgaben.
 - `POST /tasks` nimmt `{"task": "..."}` an. Aufgaben sind auf 4000 Zeichen
   begrenzt; offensichtliche Geheimnisse werden abgelehnt.
+- `POST /language` nimmt `{"prompt":"..."}` an und gibt eine Textantwort des
+  ausgewählten Sprachproviders zurück.
 - `POST /proposals/code` nimmt `{"task":"...", "context":"..."}` an und gibt
-  einen Codeentwurf als nicht angewandten Vorschlag zurück. Ein echter
-  `CodeDraftProvider` muss dafür ausdrücklich in `CoreService` eingesetzt werden;
-  der Standardprovider ist ein klar gekennzeichneter Mock und erzeugt keinen Code.
+  einen Codeentwurf als nicht angewandten Vorschlag zurück. Ein zusätzlich
+  konfigurierter echter Sprachprovider kann den Entwurf erstellen; alternativ
+  lässt sich ein eigener `CodeDraftProvider` in `CoreService` einsetzen.
 - `POST /reports/weekly` nimmt optional explizit abgerufene Quellen an:
   `{"sources":[{"source":"https://example.org","retrieved_at":"2026-01-01T12:00:00Z","summary":"..."}]}`
   und speichert einen Bericht lokal. Die API ruft die Quellen nicht selbst ab.
 - `POST /stop` nimmt keine neuen Aufgaben mehr an und wartet auf laufende Arbeit.
 
 Zum Beenden des Prozesses `Ctrl+C` verwenden. Der Server beendet sich kontrolliert.
+
+## Sprachprovider
+
+Das Text-Sprachmodul ist über `ai_core/language.py` gekapselt. Ohne weitere
+Konfiguration bleibt `AI_LANGUAGE_PROVIDER=mock`; dieser Modus erzeugt keine
+echten Sprach- oder Codeantworten. Für einen OpenAI-kompatiblen Chat-Completions-
+Endpunkt müssen `AI_LANGUAGE_PROVIDER=openai-compatible`,
+`AI_LANGUAGE_EXTERNAL_ENABLED=true`, `AI_LANGUAGE_ENDPOINT`,
+`AI_LANGUAGE_MODEL` und `AI_LANGUAGE_API_KEY` explizit in der Laufzeitumgebung
+gesetzt sein. Der Endpunkt muss HTTPS verwenden (HTTP wird nur für localhost
+akzeptiert). Zugangsdaten gehören ausschließlich in Umgebungsvariablen oder
+einen Secret-Manager, niemals in Git.
+
+Bei Aktivierung werden Prompts und nötiger Code-Kontext an den konfigurierten
+Drittanbieter gesendet. Sende keine vertraulichen Inhalte; offensichtliche
+Geheimnisse werden vor dem Senden zurückgewiesen. Der Provider hat Zeit- und
+Antwortgrößenlimits und folgt keinen HTTP-Weiterleitungen. Die Konfiguration
+lädt `.env` nicht automatisch. Dieses Modul verarbeitet Text; Audioeingabe und
+Sprachausgabe sind nicht enthalten.
 
 ## Tests
 
@@ -56,13 +77,13 @@ Mock-Provider sowie Start-/Stopp-Verhalten ab.
 - `ai_core/approvals.py`, `security.py` und `audit.py`: getrennte
   Freigabe-, Schutz- und Audit-Grundlagen. Änderungen werden nicht angewandt;
   ein Patch bleibt ein Vorschlag.
-- `ai_core/providers.py`: `MockProvider` ist ausdrücklich nur ein Mock und
-  liefert keine echten KI-Antworten. Es sind keine Zugangsdaten eingebaut.
+- `ai_core/language.py` und `ai_core/providers.py`: gekapselter Sprachdienst
+  mit OpenAI-kompatiblem optionalem Provider und explizitem Mock-Standard.
+  Zugangsdaten sind nicht eingebaut.
 - `ai_core/code_proposals.py`: begrenzte Provider-Schnittstelle für
   Codeentwürfe; kontrolliert Eingaben und Ausgaben und gibt Vorschläge nur
   zur Prüfung zurück. Es gibt keinen Dateizugriff und keine automatische
-  Codeanwendung. Im ersten Ausbau ist auch diese Funktion ohne echten
-  Code-Provider nur ein Mock.
+  Codeanwendung. Im Mock-Modus wird kein echter Code generiert.
 - `ai_core/reports.py`: erstellt und speichert Visionärs Wochenberichte.
   `VISIONARY_SOURCES` konfiguriert Quellen; Abruf und Verifikation von
   Quelldaten sind bewusst nicht implementiert.
@@ -79,6 +100,6 @@ produktive Agentenaktionen bleiben zukünftige Arbeiten.
 
 Die HTTP-Schicht verwendet nur die Standardbibliothek und ist für lokale
 Entwicklung gedacht, nicht als öffentlich betriebener Produktionsserver.
-Sinnvolle nächste Schritte sind ein unabhängig geprüfter echter Provider,
-authentifizierte Benutzerfreigaben und ein kontrollierter, isolierter
-Test-Runner. Keine davon wird hier vorgetäuscht oder automatisch aktiviert.
+Sinnvolle nächste Schritte sind Integrationstests mit dem konkret gewählten
+Provider, authentifizierte Benutzerfreigaben und ein kontrollierter, isolierter
+Test-Runner. Audiofunktionen sind ebenfalls nicht Teil dieses Text-Sprachmoduls.

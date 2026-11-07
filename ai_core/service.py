@@ -6,6 +6,7 @@ from .audit import AuditLog
 from .code_proposals import CodeDraftProvider, CodeProposalService
 from .coordinator import TaskCoordinator
 from .knowledge import KnowledgeStore
+from .language import LanguageService, TextProvider
 from .reports import VisionaryReport
 
 
@@ -16,11 +17,15 @@ class CoreService:
         *,
         configured_sources: list[str] | None = None,
         code_provider: CodeDraftProvider | None = None,
+        language_provider: TextProvider | None = None,
     ):
         self.store = KnowledgeStore(database_path)
         self.audit = AuditLog(self.store)
-        self.coordinator = TaskCoordinator(audit=self.audit)
-        self.code_proposals = CodeProposalService(code_provider)
+        self.language = LanguageService(language_provider)
+        self.coordinator = TaskCoordinator(provider=self.language, audit=self.audit)
+        self.code_proposals = CodeProposalService(
+            code_provider if code_provider is not None else self.language
+        )
         self.visionary_report = VisionaryReport(self.store, configured_sources)
         self._condition = threading.Condition()
         self._accepting = False
@@ -38,6 +43,7 @@ class CoreService:
                 "status": "ok" if self.store.health_check() else "unhealthy",
                 "accepting_tasks": self._accepting,
                 "active_tasks": self._active_tasks,
+                "language_provider": self.language.provider_name,
             }
 
     def submit_task(self, task: str) -> dict[str, object]:
@@ -66,6 +72,16 @@ class CoreService:
                 "provider": proposal.provider,
                 "content": proposal.content,
                 "applied": proposal.applied,
+            }
+        finally:
+            self._end_work()
+
+    def generate_language_response(self, prompt: str) -> dict[str, str]:
+        self._begin_work()
+        try:
+            return {
+                "provider": self.language.provider_name,
+                "response": self.language.generate(prompt),
             }
         finally:
             self._end_work()
