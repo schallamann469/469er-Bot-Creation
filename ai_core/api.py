@@ -21,7 +21,11 @@ def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
                 stopped = service.stop()
                 self._respond(200 if stopped else 504, {"stopped": stopped})
                 return
-            if self.path not in {"/tasks", "/reports/weekly"}:
+            if self.path not in {
+                "/tasks",
+                "/reports/weekly",
+                "/proposals/code",
+            }:
                 self._respond(404, {"error": "Not found"})
                 return
             try:
@@ -33,6 +37,11 @@ def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
                     raise ValueError("Request body must be a JSON object.")
                 if self.path == "/tasks":
                     result = service.submit_task(body.get("task"))
+                    self._respond(200, result)
+                elif self.path == "/proposals/code":
+                    result = service.propose_code(
+                        body.get("task"), body.get("context", "")
+                    )
                     self._respond(200, result)
                 else:
                     snapshots = body.get("sources", [])

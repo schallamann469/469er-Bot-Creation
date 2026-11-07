@@ -3,6 +3,7 @@
 import threading
 
 from .audit import AuditLog
+from .code_proposals import CodeDraftProvider, CodeProposalService
 from .coordinator import TaskCoordinator
 from .knowledge import KnowledgeStore
 from .reports import VisionaryReport
@@ -14,10 +15,12 @@ class CoreService:
         database_path: str = "data/knowledge.sqlite3",
         *,
         configured_sources: list[str] | None = None,
+        code_provider: CodeDraftProvider | None = None,
     ):
         self.store = KnowledgeStore(database_path)
         self.audit = AuditLog(self.store)
         self.coordinator = TaskCoordinator(audit=self.audit)
+        self.code_proposals = CodeProposalService(code_provider)
         self.visionary_report = VisionaryReport(self.store, configured_sources)
         self._condition = threading.Condition()
         self._accepting = False
@@ -50,6 +53,20 @@ class CoreService:
         self._begin_work()
         try:
             return self.visionary_report.generate_weekly(snapshots)
+        finally:
+            self._end_work()
+
+    def propose_code(self, task: str, context: str = "") -> dict[str, object]:
+        self._begin_work()
+        try:
+            proposal = self.code_proposals.create(task, context)
+            return {
+                "proposal_id": proposal.proposal_id,
+                "status": proposal.status,
+                "provider": proposal.provider,
+                "content": proposal.content,
+                "applied": proposal.applied,
+            }
         finally:
             self._end_work()
 

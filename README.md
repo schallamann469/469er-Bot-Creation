@@ -25,6 +25,10 @@ lokal unter `data/knowledge.sqlite3` angelegt.
 - `GET /health` prüft SQLite und meldet Annahmestatus sowie laufende Aufgaben.
 - `POST /tasks` nimmt `{"task": "..."}` an. Aufgaben sind auf 4000 Zeichen
   begrenzt; offensichtliche Geheimnisse werden abgelehnt.
+- `POST /proposals/code` nimmt `{"task":"...", "context":"..."}` an und gibt
+  einen Codeentwurf als nicht angewandten Vorschlag zurück. Ein echter
+  `CodeDraftProvider` muss dafür ausdrücklich in `CoreService` eingesetzt werden;
+  der Standardprovider ist ein klar gekennzeichneter Mock und erzeugt keinen Code.
 - `POST /reports/weekly` nimmt optional explizit abgerufene Quellen an:
   `{"sources":[{"source":"https://example.org","retrieved_at":"2026-01-01T12:00:00Z","summary":"..."}]}`
   und speichert einen Bericht lokal. Die API ruft die Quellen nicht selbst ab.
@@ -54,6 +58,11 @@ Mock-Provider sowie Start-/Stopp-Verhalten ab.
   ein Patch bleibt ein Vorschlag.
 - `ai_core/providers.py`: `MockProvider` ist ausdrücklich nur ein Mock und
   liefert keine echten KI-Antworten. Es sind keine Zugangsdaten eingebaut.
+- `ai_core/code_proposals.py`: begrenzte Provider-Schnittstelle für
+  Codeentwürfe; kontrolliert Eingaben und Ausgaben und gibt Vorschläge nur
+  zur Prüfung zurück. Es gibt keinen Dateizugriff und keine automatische
+  Codeanwendung. Im ersten Ausbau ist auch diese Funktion ohne echten
+  Code-Provider nur ein Mock.
 - `ai_core/reports.py`: erstellt und speichert Visionärs Wochenberichte.
   `VISIONARY_SOURCES` konfiguriert Quellen; Abruf und Verifikation von
   Quelldaten sind bewusst nicht implementiert.

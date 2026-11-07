@@ -9,6 +9,7 @@ from threading import Event
 from ai_core.agents import AniForge, Visionary, YinAndYang
 from ai_core.approvals import ApprovalManager, ApprovalStatus, PatchProposal
 from ai_core.api import create_server
+from ai_core.code_proposals import CodeProposalService
 from ai_core.knowledge import KnowledgeStore
 from ai_core.providers import MockProvider
 from ai_core.service import CoreService
@@ -94,6 +95,46 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(MockProvider.name, "mock")
 
 
+class CodeProposalTests(unittest.TestCase):
+    def test_real_provider_output_is_a_non_applied_proposal(self):
+        class DraftProvider:
+            name = "test-provider"
+
+            def draft_code(self, task, context, *, timeout):
+                self.asserted = (task, context, timeout)
+                return "def answer():\n    return 42\n"
+
+        provider = DraftProvider()
+        proposal = CodeProposalService(provider).create(
+            "Write a helper", "Use a small pure function."
+        )
+        self.assertEqual(proposal.provider, "test-provider")
+        self.assertEqual(proposal.status, "approval_required")
+        self.assertFalse(proposal.applied)
+        self.assertIn("return 42", proposal.content)
+        self.assertEqual(provider.asserted[:2], ("Write a helper", "Use a small pure function."))
+        self.assertGreater(provider.asserted[2], 0)
+
+    def test_mock_disclosure_and_input_and_output_guards(self):
+        proposal = CodeProposalService().create("Write a function")
+        self.assertEqual(proposal.provider, "mock")
+        self.assertIn("MOCK", proposal.content)
+        self.assertFalse(proposal.applied)
+        with self.assertRaises(ValueError):
+            CodeProposalService().create("api_key=do-not-send")
+        with self.assertRaises(ValueError):
+            CodeProposalService().create("Write code", "access_token=hidden")
+
+        class SecretProvider:
+            name = "test"
+
+            def draft_code(self, task, context, *, timeout):
+                return "secret=leaked"
+
+        with self.assertRaises(ValueError):
+            CodeProposalService(SecretProvider()).create("Write code")
+
+
 class LifecycleTests(unittest.TestCase):
     def test_stop_rejects_new_tasks_and_waits_for_active_work(self):
         temp = tempfile.TemporaryDirectory()
@@ -127,6 +168,7 @@ class APITests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         service = CoreService(str(Path(self.temp.name) / "api.sqlite3"))
+        self.service = service
         self.server = create_server(service, port=0)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.start()
@@ -173,6 +215,22 @@ class APITests(unittest.TestCase):
         report = json.loads(response.read())
         self.assertEqual(response.status, 201)
         self.assertIn("2026-11-05T12:00:00Z", report["content"])
+
+    def test_code_proposal_endpoint_never_applies_mock_draft(self):
+        self.connection.request(
+            "POST",
+            "/proposals/code",
+            body=json.dumps({"task": "Write a helper"}),
+            headers={"Content-Type": "application/json"},
+        )
+        response = self.connection.getresponse()
+        proposal = json.loads(response.read())
+        self.assertEqual(response.status, 200)
+        self.assertEqual(proposal["status"], "approval_required")
+        self.assertEqual(proposal["provider"], "mock")
+        self.assertFalse(proposal["applied"])
+        self.assertIn("MOCK", proposal["content"])
+        self.assertFalse(list(Path(self.temp.name).glob("*.py")))
 
     def test_malformed_task_and_stop(self):
         self.connection.request(
