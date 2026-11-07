@@ -1,0 +1,5 @@
+provider: ollama
+model: "llama3.1:8b"
+system_prompt: "Du bist ein hilfreicher Assistent. Antworte knapp und auf Deutsch."
+endpoint: "http://127.0.0.1:11434"
+timeout_seconds: 120

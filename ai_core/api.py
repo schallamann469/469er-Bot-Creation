@@ -10,6 +10,8 @@ from .service import CoreService
 
 def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
     class APIHandler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
         def do_GET(self) -> None:
             if self.path != "/health":
                 self._respond(404, {"error": "Not found"})
@@ -24,6 +26,7 @@ def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
             if self.path not in {
                 "/tasks",
                 "/language",
+                "/language/stream",
                 "/reports/weekly",
                 "/proposals/code",
             }:
@@ -42,6 +45,37 @@ def handler_for(service: CoreService) -> Type[BaseHTTPRequestHandler]:
                 elif self.path == "/language":
                     result = service.generate_language_response(body.get("prompt"))
                     self._respond(200, result)
+                elif self.path == "/language/stream":
+                    prompt = body.get("prompt")
+                    if not isinstance(prompt, str):
+                        raise ValueError("prompt must be text.")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Transfer-Encoding", "chunked")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.end_headers()
+                    try:
+                        for text in service.stream_language_response(prompt):
+                            chunk = text.encode("utf-8")
+                            if chunk:
+                                self.wfile.write(f"{len(chunk):X}\r\n".encode("ascii"))
+                                self.wfile.write(chunk + b"\r\n")
+                                self.wfile.flush()
+                        self.wfile.write(b"0\r\n\r\n")
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError):
+                        logging.getLogger("ai_core.api").info(
+                            "Streaming client disconnected"
+                        )
+                    except Exception:
+                        logging.getLogger("ai_core.api").exception(
+                            "Language stream failed after response started"
+                        )
+                        try:
+                            self.wfile.write(b"0\r\n\r\n")
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError):
+                            pass
                 elif self.path == "/proposals/code":
                     result = service.propose_code(
                         body.get("task"), body.get("context", "")

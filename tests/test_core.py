@@ -10,8 +10,10 @@ from ai_core.agents import AniForge, Visionary, YinAndYang
 from ai_core.approvals import ApprovalManager, ApprovalStatus, PatchProposal
 from ai_core.api import create_server
 from ai_core.code_proposals import CodeProposalService
+from ai_core.config import load_language_config
 from ai_core.language import (
     LanguageService,
+    OllamaProvider,
     OpenAICompatibleProvider,
     _NoRedirect,
     provider_from_environment,
@@ -142,6 +144,66 @@ class CodeProposalTests(unittest.TestCase):
 
 
 class LanguageTests(unittest.TestCase):
+    def test_yaml_config_has_requested_model_and_prompt(self):
+        config = load_language_config(Path(__file__).parents[1] / "config.yaml")
+        self.assertEqual(config.model, "llama3.1:8b")
+        self.assertEqual(
+            config.system_prompt,
+            "Du bist ein hilfreicher Assistent. Antworte knapp und auf Deutsch.",
+        )
+        self.assertEqual(config.provider, "ollama")
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        invalid_config = Path(temp.name) / "config.yaml"
+        invalid_config.write_text("- not-a-mapping\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            load_language_config(invalid_config)
+
+    def test_ollama_provider_streams_text_with_system_prompt(self):
+        provider = OllamaProvider(
+            endpoint="http://127.0.0.1:11434",
+            model="llama3.1:8b",
+            timeout_seconds=20,
+        )
+
+        class FakeResponse:
+            def __init__(self):
+                self.lines = iter(
+                    [
+                        b'{"message":{"content":"Guten "},"done":false}\n',
+                        b'{"message":{"content":"Tag"},"done":true}\n',
+                    ]
+                )
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def readline(self, limit):
+                return next(self.lines, b"")
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                self.timeout = timeout
+                return FakeResponse()
+
+        opener = FakeOpener()
+        provider._opener = opener
+        chunks = list(
+            provider.stream(
+                "Sag Hallo", system_prompt="Antworte auf Deutsch.", timeout=5
+            )
+        )
+        self.assertEqual(chunks, ["Guten ", "Tag"])
+        payload = json.loads(opener.request.data)
+        self.assertEqual(payload["model"], "llama3.1:8b")
+        self.assertTrue(payload["stream"])
+        self.assertEqual(payload["messages"][0]["content"], "Antworte auf Deutsch.")
+        self.assertEqual(opener.timeout, 5)
+
     def test_external_provider_is_disabled_by_default_and_requires_opt_in(self):
         self.assertEqual(provider_from_environment({}).name, "mock")
         with self.assertRaises(ValueError):
@@ -271,6 +333,34 @@ class APITests(unittest.TestCase):
         self.assertEqual(language_result["provider"], "mock")
         self.assertIn("MOCK", language_result["response"])
 
+    def test_language_stream_endpoint_returns_plain_text_chunks(self):
+        class StreamingProvider:
+            name = "test-stream"
+
+            def generate(self, prompt, *, timeout):
+                return "unused"
+
+            def stream(self, prompt, *, system_prompt, timeout):
+                self.last_request = (prompt, system_prompt, timeout)
+                yield "Guten "
+                yield "Tag"
+
+        provider = StreamingProvider()
+        self.service.language.provider = provider
+        self.connection.request(
+            "POST",
+            "/language/stream",
+            body=json.dumps({"prompt": "Sag Hallo"}),
+            headers={"Content-Type": "application/json"},
+        )
+        response = self.connection.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Content-Type"), "text/plain; charset=utf-8")
+        self.assertEqual(response.getheader("Transfer-Encoding"), "chunked")
+        self.assertEqual(response.read(), "Guten Tag".encode())
+        self.assertEqual(provider.last_request[0], "Sag Hallo")
+
+        self.service.language.provider = MockProvider()
         self.connection.request(
             "POST", "/tasks", body=json.dumps({"task": "Plan a small change."}),
             headers={"Content-Type": "application/json"},
@@ -321,14 +411,20 @@ class APITests(unittest.TestCase):
             "POST", "/tasks", body=json.dumps({"task": "api_key=not-a-secret"}),
             headers={"Content-Type": "application/json"},
         )
-        self.assertEqual(self.connection.getresponse().status, 400)
+        response = self.connection.getresponse()
+        self.assertEqual(response.status, 400)
+        response.read()
         self.connection.request("POST", "/stop", body=b"")
-        self.assertEqual(self.connection.getresponse().status, 200)
+        response = self.connection.getresponse()
+        self.assertEqual(response.status, 200)
+        response.read()
         self.connection.request(
             "POST", "/tasks", body=json.dumps({"task": "later"}),
             headers={"Content-Type": "application/json"},
         )
-        self.assertEqual(self.connection.getresponse().status, 503)
+        response = self.connection.getresponse()
+        self.assertEqual(response.status, 503)
+        response.read()
 
 
 if __name__ == "__main__":

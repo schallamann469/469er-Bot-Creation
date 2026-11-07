@@ -1,17 +1,19 @@
 # 469er Bot Creation
 
 Kleiner, lokaler und modularer Python-Grundkern für Yin und Yang, Visionär und
-das isolierte AniForge-Platzhaltemodul. Der erste Ausbau verwendet ausschließlich
-die Python-Standardbibliothek.
+das isolierte AniForge-Platzhaltemodul. Bis auf PyYAML für die YAML-Konfiguration
+verwendet der Grundkern ausschließlich die Python-Standardbibliothek.
 
 ## Installation und Start
 
-Python 3.10 oder neuer wird benötigt. Es gibt keine zusätzlichen Abhängigkeiten:
+Python 3.10 oder neuer wird benötigt. PyYAML ist die einzige zusätzliche Abhängigkeit:
 
 ```sh
 python -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
 cp .env.example .env
+ollama pull llama3.1:8b
 python -m ai_core.main
 ```
 
@@ -27,6 +29,8 @@ lokal unter `data/knowledge.sqlite3` angelegt.
   begrenzt; offensichtliche Geheimnisse werden abgelehnt.
 - `POST /language` nimmt `{"prompt":"..."}` an und gibt eine Textantwort des
   ausgewählten Sprachproviders zurück.
+- `POST /language/stream` nimmt dasselbe JSON an und liefert die Antwort
+  fortlaufend als `text/plain`.
 - `POST /proposals/code` nimmt `{"task":"...", "context":"..."}` an und gibt
   einen Codeentwurf als nicht angewandten Vorschlag zurück. Ein zusätzlich
   konfigurierter echter Sprachprovider kann den Entwurf erstellen; alternativ
@@ -40,10 +44,15 @@ Zum Beenden des Prozesses `Ctrl+C` verwenden. Der Server beendet sich kontrollie
 
 ## Sprachprovider
 
-Das Text-Sprachmodul ist über `ai_core/language.py` gekapselt. Ohne weitere
-Konfiguration bleibt `AI_LANGUAGE_PROVIDER=mock`; dieser Modus erzeugt keine
-echten Sprach- oder Codeantworten. Für einen OpenAI-kompatiblen Chat-Completions-
-Endpunkt müssen `AI_LANGUAGE_PROVIDER=openai-compatible`,
+`config.yaml` konfiguriert das lokale Ollama-Modell, System-Prompt und Timeout.
+Ollama muss separat laufen; das Modell wird nicht automatisch heruntergeladen.
+Standard ist `llama3.1:8b` unter `http://127.0.0.1:11434`. Setze
+`provider: mock`, wenn Ollama nicht verfügbar ist; dieser Modus erzeugt keine
+echten Sprach- oder Codeantworten.
+
+Das Text-Sprachmodul ist über `ai_core/language.py` gekapselt. Für einen
+OpenAI-kompatiblen Chat-Completions-Endpunkt müssen
+`AI_LANGUAGE_PROVIDER=openai-compatible`,
 `AI_LANGUAGE_EXTERNAL_ENABLED=true`, `AI_LANGUAGE_ENDPOINT`,
 `AI_LANGUAGE_MODEL` und `AI_LANGUAGE_API_KEY` explizit in der Laufzeitumgebung
 gesetzt sein. Der Endpunkt muss HTTPS verwenden (HTTP wird nur für localhost
@@ -53,9 +62,8 @@ einen Secret-Manager, niemals in Git.
 Bei Aktivierung werden Prompts und nötiger Code-Kontext an den konfigurierten
 Drittanbieter gesendet. Sende keine vertraulichen Inhalte; offensichtliche
 Geheimnisse werden vor dem Senden zurückgewiesen. Der Provider hat Zeit- und
-Antwortgrößenlimits und folgt keinen HTTP-Weiterleitungen. Die Konfiguration
-lädt `.env` nicht automatisch. Dieses Modul verarbeitet Text; Audioeingabe und
-Sprachausgabe sind nicht enthalten.
+Antwortgrößenlimits und folgt keinen HTTP-Weiterleitungen. Die Konfiguration lädt `.env` nicht automatisch. Dieses Modul verarbeitet
+Text; Audioeingabe und Sprachausgabe sind nicht enthalten.
 
 ## Tests
 
@@ -77,8 +85,9 @@ Mock-Provider sowie Start-/Stopp-Verhalten ab.
 - `ai_core/approvals.py`, `security.py` und `audit.py`: getrennte
   Freigabe-, Schutz- und Audit-Grundlagen. Änderungen werden nicht angewandt;
   ein Patch bleibt ein Vorschlag.
-- `ai_core/language.py` und `ai_core/providers.py`: gekapselter Sprachdienst
-  mit OpenAI-kompatiblem optionalem Provider und explizitem Mock-Standard.
+- `ai_core/language.py` und `ai_core/config.py`: gekapselter Sprachdienst,
+  lokales Ollama-Streaming und optionaler OpenAI-kompatibler Provider.
+  `config.yaml` enthält Modell und System-Prompt; der Mock bleibt auswählbar.
   Zugangsdaten sind nicht eingebaut.
 - `ai_core/code_proposals.py`: begrenzte Provider-Schnittstelle für
   Codeentwürfe; kontrolliert Eingaben und Ausgaben und gibt Vorschläge nur

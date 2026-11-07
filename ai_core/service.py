@@ -18,10 +18,16 @@ class CoreService:
         configured_sources: list[str] | None = None,
         code_provider: CodeDraftProvider | None = None,
         language_provider: TextProvider | None = None,
+        system_prompt: str = "Du bist ein hilfreicher Assistent. Antworte knapp und auf Deutsch.",
+        language_timeout: float = 120.0,
     ):
         self.store = KnowledgeStore(database_path)
         self.audit = AuditLog(self.store)
-        self.language = LanguageService(language_provider)
+        self.language = LanguageService(
+            language_provider,
+            system_prompt=system_prompt,
+            max_seconds=language_timeout,
+        )
         self.coordinator = TaskCoordinator(provider=self.language, audit=self.audit)
         self.code_proposals = CodeProposalService(
             code_provider if code_provider is not None else self.language
@@ -83,6 +89,13 @@ class CoreService:
                 "provider": self.language.provider_name,
                 "response": self.language.generate(prompt),
             }
+        finally:
+            self._end_work()
+
+    def stream_language_response(self, prompt: str):
+        self._begin_work()
+        try:
+            yield from self.language.stream(prompt)
         finally:
             self._end_work()
 
